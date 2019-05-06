@@ -25,7 +25,7 @@ unnecessarily fill up the host machine's disk space requiring the host machine's
 To build the Docker image, Docker must be installed on the system and the Docker daemon running. Depending on the
 Linux system, the following packages will need to be installed:
 
-1. docker-io and lxc for Centos6 
+1. docker-io and lxc for Centos6
 2. docker and lxc for Centos7
 
 Next the Docker daemon service needs to be started
@@ -38,22 +38,22 @@ Example Dockerfile
 
 .. code-block:: bash
     :linenos:
-    
+
     #Inherit from the centos 7 base image
     FROM centos:6
-    
+
     #It is a good practice to set the version number and creator in the dockerfile
-    ENV VERSION 1.0.0  
+    ENV VERSION 1.0.0
     MAINTAINER John_Doe
-    
+
     #The RUN command will execute commands in the container
     RUN mkdir -p /app
-    
+
     #The ADD command will copy both entire directories and single files. COPY only copies files and for this
     #use case is preferred. (see the Dockerfile best practices at https://docs.docker.com/engine/userguide/eng-image/dockerfile_best-practices)
     ADD Code/ /app/Code
     COPY my_wrapper.sh /app/my_wrapper.sh
-    
+
     #Multiple RUN commands can be chained together using back slashes and &&
     #It's a good idea to finish with a "yum clean all" on centos images as this will
     #remove repository cache files making your image smaller
@@ -65,7 +65,7 @@ Example Dockerfile
 
     #Environment variables can be set using the ENV command
     ENV DISPLAY $HOSTNAME:0.0
-    
+
     #Create a virtual frame buffer for algorithms that need a display
     RUN Xvfb :0 -screen 0 1280x1024x24 -ac -terminate > /dev/null &
 
@@ -74,28 +74,70 @@ Example Dockerfile
 
     #The ENTRYPOINT is the default command that is run when the container is started
     ENTRYPOINT [ "/app/my_wrapper.sh"]
-    
+
+Building a Seed
+-----------------------------------------------
+Refer to the Seed documentation on the Seed Specification: :ref:SEED_SPEC_DOCUMENTATION
+
+Once you have a functional Docker container you are ready to build your Seed image. This may be done using the Seed
+CLI to assist in generating, validating, building, and publishing your algorithm.
+
+Using the Seed CLI
+------------------------------------------------
+The first step when starting to package an algorithm for Seed compliance is to define the requirements and interface. This
+is done by a combination the Dockerfile, and the resource requirement definition and input /  output specification
+(seed.manifest.json).
+
+Generating a template seed.manifest.json may be done using the Seed CLI's init command. This command will generate a
+template manfiest in the current directory that may be then edited with values specific to your algorithm. See
+:ref:SEED_DOCUMENTATION for a full definition of each field in the manifest.
+
+Generate a template seed.manifest.json file using the seed init cli command:
+.. code-block:: bash
+    seed init
+
+The Seed CLI also provides a tool to ensure the seed manifest complies with the Seed schema and is valid json. Run the
+validate command against your seed.manifest.json file to ensure there are no errors:
+.. code-block:: bash
+    seed validate
+
+Once the manifest is error free, use the CLI's build command to automtically build and properly tag your Seed image. By
+default, this command assumes both the Dockerfile and seed.manifest.json reside in the current directory.
+.. code-block:: bash
+    seed build
+
+This will result in a new Docker image that contains com.ngageoint.seed.manifest LABEL and is named according to spec
+constraint:
+Example:    my-alg-job-0.0.1-seed:1.0.0
+
+This image can now be executed via the seed run command or pushed to a remote image registry by way of seed publish.
+
+The seed build command also provides the option to automatically publish the image after building via the -publish flag.
+All flags specified by the seed publish command are available for use.
 
 Building a Docker container from the dockerfile
 -----------------------------------------------
 
 Within a single folder, you should have
 
-1. Your Dockerfile
-2. Your code/application executables, optionally in folders
-3. Any configuration files
+1. Your seed.manifest.json file
+2. Your Dockerfile
+3. Your code/application executables, optionally in folders
+4. Any configuration files
 
 To build a Docker container, first change your current working directory to the directory containing your dockerfile.
 Next, execute the following build statement from the command line:
 
 .. code-block:: bash
 
-    docker build -t hostname:port/algorithm_name:tag .
-    
+    docker build -t hostname:port/algorithm_name-job_version-seed:package_version .
+
 The command "docker build" will build a new image from the source code at the path, which in this case is ".", which
-refers to the current working directory.  The argument flag "-t" allows the build to be tagged with a name.  The
-hostname and port specify a local docker index for distribution to scale. If you intend to store your image in the main
-docker hub on the internet, leave these off. The tag is useful for specifying a version of the algorithm.
+refers to the current working directory.  The argument flag "-t" allows the build to be tagged with a name.  Seed images
+should be in the format job_name-job_version-seed:package_version (ex. my-job-1.0.0-seed:1.0.0) in order to be
+discoverable by Seed Silo.  The hostname and port specify a local docker index for distribution to scale. If you intend
+to store your image in the main docker hub on the internet, leave these off. The tag is useful for specifying a version
+of the algorithm.
 
 
 Testing a built docker container
@@ -107,15 +149,15 @@ good way to test your container before pushing it to the Docker registry.  To te
 
 .. code-block:: bash
 
-    docker run -it --rm --privileged -v /host_folder:/docker_folder:rw --entrypoint="/bin/bash" --name myFirstDocker hostname:port/algorithm_name:tag
-    
+    docker run -it --rm --privileged -v /host_folder:/docker_folder:rw --entrypoint="/bin/bash" --name myFirstDocker hostname:port/algorithm_name-job_version-seed:package_version
+
 The "-it" flags specify interactive mode where the standard input will be kept open on the container even if it is not
 attached to anything.
 
 The "--rm" flag will remove the container after it exists. Otherwise the container and its filesystem changes will
 persist.
 
-The "--privileged" flag is optional and is only necessary if you are mounting an NFS container inside your wrapper.  
+The "--privileged" flag is optional and is only necessary if you are mounting an NFS container inside your wrapper.
 
 The "-v" flag will mount a volume from the host machine so that it will be available within the container.  This is
 useful to mount a directory containing data for testing your algorithm and output results to another mounted volume to
@@ -141,7 +183,7 @@ To see a list of currently cached Docker containers on your host machine
 .. code-block:: bash
 
     docker images
-    
+
 To see a list of currently running/stopped Docker containers on your host machine
 
 .. code-block:: bash
@@ -153,19 +195,19 @@ To stop a running Docker container
 .. code-block:: bash
 
     docker stop <container_name>
-    
+
 To start a stopped Docker container
 
 .. code-block:: bash
 
     docker start <container_name>
-    
+
 To remove a stopped container
 
 .. code-block:: bash
 
     docker rm <container_name>
-    
+
 To enter a currently running container and get a bash shell
 
 .. code-block:: bash
